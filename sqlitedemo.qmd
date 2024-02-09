@@ -1,0 +1,104 @@
+---
+title: "SQLite Demo"
+format: html
+editor: visual
+---
+
+## Getting started
+
+Adapted from [**Data Analysis and Visualisation in R for Ecologists**](https://datacarpentry.org/R-ecology-lesson/index.html).
+
+We'll be working with the small mammal survey data from the Portal Project in Arizona.
+
+Open RStudio and create a new project. You'll need the following packages: `tidyverse`, `RSQLite`. Install them if necessary.
+
+## Download the data
+
+```{r}
+dir.create("data_raw", showWarnings = FALSE)
+download.file(url = "https://ndownloader.figshare.com/files/2292171",
+              destfile = "data_raw/portal_mammals.sqlite", mode = "wb")
+
+```
+
+## Connect to the database
+
+```{r}
+library(dplyr)
+library(dbplyr)
+mammals <- DBI::dbConnect(RSQLite::SQLite(), "data_raw/portal_mammals.sqlite")
+src_dbi(mammals)
+
+```
+
+### Query database with SQL syntax
+
+```{r}
+tbl(mammals, sql("SELECT year, species_id, plot_id FROM surveys"))
+
+```
+
+### Query database with `dplyr` syntax
+
+```{r}
+surveys <- tbl(mammals, "surveys")
+surveys %>%
+    select(year, species_id, plot_id)
+head(surveys, n = 10)
+
+```
+
+## **Simple database queries**
+
+First, let’s only request rows of the `surveys` table in which `weight` is less than 5 and keep only the species_id, sex, and weight columns.
+
+```{r}
+surveys %>%
+  filter(weight < 5) %>%
+  select(species_id, sex, weight)
+
+```
+
+To instruct R to stop being lazy, e.g. to retrieve all of the query results from the database, we add the `collect()` command to our pipe. It indicates that our database query is finished: time to get the *final* results and load them into the R session.
+
+```{r}
+data_subset <- surveys %>%
+  filter(weight < 5) %>%
+  select(species_id, sex, weight) %>%
+  collect()
+data_subset
+
+```
+
+## **Complex database queries**
+
+To illustrate how to use **`dplyr`** with these complex queries, we are going to join the `plots` and `surveys` tables. The `plots` table in the database contains information about the different plots surveyed by the researchers.
+
+```{r}
+plots <- tbl(mammals, "plots")
+plots
+```
+
+```{r}
+plots %>%
+  filter(plot_id == 1) %>%
+  inner_join(surveys) %>%
+  collect()
+
+```
+
+::: callout-note
+## Challenge
+
+Write a query that returns the number of rodents observed in each plot in each year.
+
+Hint: Connect to the species table and write a query that joins the species and survey tables together to exclude all non-rodents. The query should return counts of rodents by year.
+:::
+
+::: callout-note
+## Challenge
+
+Write a query that returns the total number of rodents in each genus caught in the different plot types.
+
+Hint: Write a query that joins the species, plot, and survey tables together. The query should return counts of genus by plot type.
+:::
